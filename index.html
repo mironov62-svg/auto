@@ -15,7 +15,6 @@
             padding-bottom: 30px;
         }
 
-        /* Шапка с кнопкой обновления */
         .header-bar {
             display: flex;
             justify-content: space-between;
@@ -80,13 +79,11 @@
         }
         .card:active { transform: scale(0.98); }
 
-        /* Подсветка раздела «К исполнению» */
         #section-progress .card {
             border-left-color: #f5a623;
             background: #fffdf5;
         }
 
-        /* Стиль для выполненных (блеклый) */
         #section-done .card {
             opacity: 0.7;
             border-left-color: #28a745;
@@ -274,9 +271,9 @@
 
 <script>
 // ============================================================
-// НАСТРОЙКИ
+// НАСТРОЙКИ (ВСТАВЬТЕ ВАШ ВЕБХУК НИЖЕ)
 // ============================================================
-const WEBHOOK_URL = 'https://b24-964ige.bitrix24.ru/rest/1/2e0ip1konlsrsobu/';
+const WEBHOOK_URL = 'https://b24-964ige.bitrix24.ru/rest/1/ХХХ/';
 const ENTITY_TYPE_ID = 1110;
 
 const STAGE_START = 'DT1110_74:NEW';
@@ -288,6 +285,7 @@ const FIELD_ADDRESS = 'ufCrm66_1792116814';
 const FIELD_WEIGHT = 'ufCrm66_1792116834';
 const FIELD_COMMENT = 'ufCrm66_1792116866';
 const FIELD_DEADLINE = 'ufCrm66_1792116893';
+const FIELD_DRIVER = 'ufCrm66_1792116928'; // Поле "Водитель" (Привязка к пользователю)
 const FIELD_PHOTO = 'ufCrm66_1792125123';
 
 // ============================================================
@@ -366,10 +364,9 @@ async function loadItems() {
     document.getElementById('content').style.display = 'none';
 
     try {
-        // ВАЖНО: добавили 'ALL', чтобы подтянулись выполненные
         const res = await apiCall('crm.item.list', {
             entityTypeId: ENTITY_TYPE_ID,
-            select: ['id', 'title', 'stageId', 'assignedById', FIELD_ORG, FIELD_DEADLINE],
+            select: ['id', 'title', 'stageId', 'assignedById', FIELD_ORG, FIELD_DEADLINE, FIELD_DRIVER],
             order: { id: 'ASC' },
             filter: { stageId: [STAGE_START, STAGE_IN_PROGRESS, STAGE_DONE] }
         });
@@ -377,8 +374,15 @@ async function loadItems() {
         if (res.error) throw new Error(res.error_description || res.error);
 
         const items = res.result?.items || [];
-        const userIds = [...new Set(items.map(i => i.assignedById).filter(Boolean))];
-        await fetchUserNames(userIds);
+        
+        // Собираем ID всех пользователей (и ответственных, и водителей)
+        const userIds = new Set();
+        items.forEach(i => {
+            if (i.assignedById) userIds.add(i.assignedById);
+            if (i[FIELD_DRIVER]) userIds.add(i[FIELD_DRIVER]);
+        });
+        
+        await fetchUserNames([...userIds]);
 
         const requests = items.filter(i => i.stageId === STAGE_START);
         const inProgress = items.filter(i => i.stageId === STAGE_IN_PROGRESS);
@@ -414,11 +418,14 @@ function renderList(containerId, items, emptyText) {
     container.innerHTML = items.map(item => {
         const org = extractText(item[FIELD_ORG]);
         const deadline = formatDate(item[FIELD_DEADLINE]);
-        const assignedName = usersCache[item.assignedById] || '';
+        
+        // Берем имя водителя, если есть, иначе ответственного
+        const driverId = item[FIELD_DRIVER];
+        const driverName = usersCache[driverId] || usersCache[item.assignedById] || '';
         
         let metaParts = [];
         if (deadline !== '—') metaParts.push('Срок: ' + deadline);
-        if (assignedName) metaParts.push(assignedName);
+        if (driverName) metaParts.push(driverName);
         const metaStr = metaParts.join(' | ');
 
         return `
@@ -447,7 +454,7 @@ async function openCard(id) {
             select: [
                 'id', 'title', 'stageId', 'assignedById', 
                 FIELD_ORG, FIELD_ADDRESS, FIELD_WEIGHT, 
-                FIELD_COMMENT, FIELD_DEADLINE, FIELD_PHOTO
+                FIELD_COMMENT, FIELD_DEADLINE, FIELD_PHOTO, FIELD_DRIVER
             ]
         });
 
@@ -456,10 +463,14 @@ async function openCard(id) {
         const item = res.result?.item;
         if (!item) throw new Error('Заявка не найдена');
 
-        if (item.assignedById && !usersCache[item.assignedById]) {
-            await fetchUserNames([item.assignedById]);
-        }
+        // Подгружаем имена, если их нет в кэше
+        const uIds = [];
+        if (item.assignedById) uIds.push(item.assignedById);
+        if (item[FIELD_DRIVER]) uIds.push(item[FIELD_DRIVER]);
+        await fetchUserNames(uIds);
+
         const assignedName = usersCache[item.assignedById] || 'Не назначен';
+        const driverName = usersCache[item[FIELD_DRIVER]] || 'Не назначен';
         const isDone = item.stageId === STAGE_DONE;
 
         let photosHtml = '';
@@ -486,6 +497,10 @@ async function openCard(id) {
             <div class="field">
                 <div class="field-label">Заказчик (Ответственный)</div>
                 <div class="field-value">${assignedName}</div>
+            </div>
+            <div class="field">
+                <div class="field-label">Водитель</div>
+                <div class="field-value">${driverName}</div>
             </div>
             <div class="field">
                 <div class="field-label">Комментарий</div>
