@@ -407,69 +407,20 @@ async function openCard(id) {
         const item = res.result?.item;
         if (!item) throw new Error('Заявка не найдена');
 
-        if (item.assignedById && !usersCache[item.assignedById]) {
-            await fetchUserNames([item.assignedById]);
-        }
-        const assignedName = usersCache[item.assignedById] || 'Не назначен';
-        const isDone = item.stageId === STAGE_DONE;
-
-        let photosHtml = '';
-        const photos = item[FIELD_PHOTO];
-        if (Array.isArray(photos) && photos.length > 0) {
-            const photosList = photos.map(f => {
-                const url = f.url || f.downloadUrl || f.URL || '';
-                return url ? `<img src="${url}" alt="фото">` : '';
-            }).filter(Boolean);
-
-            if (photosList.length > 0) {
-                photosHtml = '<div class="photo-preview">' + photosList.join('') + '</div>';
-            }
-        }
+        const debugData = {
+            "Учреждение": item[FIELD_ORG],
+            "Адрес": item[FIELD_ADDRESS],
+            "Вес": item[FIELD_WEIGHT],
+            "Комментарий": item[FIELD_COMMENT],
+            "Срок": item[FIELD_DEADLINE]
+        };
 
         modal.innerHTML = `
             <button class="modal-close" onclick="closeModal()">✕</button>
-            <h3>№${item.id} ${extractText(item[FIELD_ORG]) !== '—' ? extractText(item[FIELD_ORG]) : ''}</h3>
+            <h3>Данные из Битрикс (Заявка №${id})</h3>
+            
+            <div style="background:#f5f5f5; padding:10px; font-size:12px; overflow-x:auto; border-radius:8px; margin-bottom:15px; font-family:monospace; white-space:pre-wrap;">${JSON.stringify(debugData, null, 2)}</div>
 
-            <div class="field">
-                <div class="field-label">Адрес</div>
-                <div class="field-value">${extractText(item[FIELD_ADDRESS])}</div>
-            </div>
-            <div class="field">
-                <div class="field-label">Заказчик (Ответственный)</div>
-                <div class="field-value">${assignedName}</div>
-            </div>
-            <div class="field">
-                <div class="field-label">Комментарий</div>
-                <div class="field-value">${extractText(item[FIELD_COMMENT])}</div>
-            </div>
-            <div class="field">
-                <div class="field-label">Вес</div>
-                <div class="field-value">${extractText(item[FIELD_WEIGHT])}</div>
-            </div>
-            <div class="field">
-                <div class="field-label">Срок исполнения</div>
-                <div class="field-value">${formatDate(item[FIELD_DEADLINE])}</div>
-            </div>
-
-            ${photosHtml ? '<div class="field"><div class="field-label">Фото</div>' + photosHtml + '</div>' : ''}
-
-            <hr style="border:none;border-top:1px solid #eee;margin:16px 0;">
-
-            <div class="field">
-                <div class="field-label">Добавить фото</div>
-                <div class="file-input-wrapper">
-                    <input type="file" id="photoInput" accept="image/*" multiple>
-                </div>
-            </div>
-
-            <div class="field">
-                <div class="field-label">Отчёт о доставке (необязательно)</div>
-                <textarea id="reportInput" placeholder="Введите отчёт…"></textarea>
-            </div>
-
-            <button class="btn btn-success" id="doneBtn" onclick="markDone()" ${isDone ? 'disabled' : ''}>
-                ${isDone ? 'Уже выполнено' : 'Выполнено'}
-            </button>
             <button class="btn btn-secondary" onclick="closeModal()">Закрыть</button>
         `;
     } catch (e) {
