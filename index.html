@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="robots" content="noindex, nofollow">
     <title>Автомобили — Доставка</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -11,17 +12,61 @@
             background: #f0f2f5;
             color: #1a1a1a;
             padding: 12px;
-            padding-bottom: 80px;
+            padding-bottom: 80px; /* Отступ для кнопки снизу */
         }
+
+        /* Шапка с кнопкой обновления */
+        .header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            background: #fff;
+            padding: 10px 16px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+        .refresh-btn-text {
+            background: #e9ecef;
+            color: #2d6cdf;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .refresh-btn-text:active { background: #dfe3e6; }
+
         h2 {
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 600;
             margin: 16px 0 8px;
             color: #555;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         h2:first-of-type { margin-top: 0; }
+
+        .badge {
+            background: #eee;
+            color: #666;
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: normal;
+        }
 
         .card {
             background: #fff;
@@ -35,9 +80,16 @@
         }
         .card:active { transform: scale(0.98); }
 
-        .in-progress .card {
+        /* Подсветка раздела «К исполнению» */
+        #section-progress .card {
             border-left-color: #f5a623;
             background: #fffdf5;
+        }
+
+        /* Стиль для выполненных (блеклый) */
+        #section-done .card {
+            opacity: 0.7;
+            border-left-color: #28a745;
         }
 
         .card-title {
@@ -154,25 +206,6 @@
         .btn-secondary { background: #e9ecef; color: #333; margin-top: 8px; }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        .refresh-btn {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 56px; height: 56px;
-            border-radius: 50%;
-            background: #2d6cdf;
-            color: #fff;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(45,108,223,0.4);
-            z-index: 50;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .refresh-btn:active { transform: scale(0.92); }
-
         .loading { text-align: center; padding: 40px; color: #999; }
         .error-msg {
             background: #fee;
@@ -182,11 +215,11 @@
             margin: 12px 0;
             font-size: 14px;
         }
-        .empty { text-align: center; padding: 24px; color: #aaa; font-size: 14px; }
+        .empty { text-align: center; padding: 16px; color: #aaa; font-size: 14px; }
 
         .toast {
             position: fixed;
-            bottom: 90px;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
             background: #333;
@@ -205,21 +238,37 @@
 <body>
 
 <div id="app">
+    <!-- Шапка с кнопкой обновления -->
+    <div class="header-bar">
+        <div class="header-title">Мои заявки</div>
+        <button class="refresh-btn-text" onclick="loadItems()">
+            <span style="font-size:16px;">⟳</span> Обновить
+        </button>
+    </div>
+
     <div id="loading" class="loading">Загрузка заявок…</div>
     <div id="error" class="error-msg" style="display:none;"></div>
+    
     <div id="content" style="display:none;">
+        <!-- Новые заявки -->
         <div id="section-requests">
-            <h2>Заявки</h2>
+            <h2>Заявки <span class="badge" id="badge-requests">0</span></h2>
             <div id="list-requests"></div>
         </div>
-        <div id="section-progress" class="in-progress" style="margin-top: 20px;">
-            <h2>К исполнению</h2>
+
+        <!-- В работе -->
+        <div id="section-progress">
+            <h2>К исполнению <span class="badge" id="badge-progress">0</span></h2>
             <div id="list-progress"></div>
+        </div>
+
+        <!-- Выполненные -->
+        <div id="section-done">
+            <h2>Выполнено <span class="badge" id="badge-done">0</span></h2>
+            <div id="list-done"></div>
         </div>
     </div>
 </div>
-
-<button class="refresh-btn" onclick="loadItems()" title="Обновить">⟳</button>
 
 <div class="modal-overlay" id="modalOverlay">
     <div class="modal" id="modalContent"></div>
@@ -231,20 +280,20 @@
 // ============================================================
 // НАСТРОЙКИ (ВСТАВЬТЕ ВАШ ВЕБХУК НИЖЕ)
 // ============================================================
-const WEBHOOK_URL = 'https://b24-964ige.bitrix24.ru/rest/1/2e0ip1konlsrsobu/';
+const WEBHOOK_URL = 'https://b24-964ige.bitrix24.ru/rest/1/ХХХ/';
 const ENTITY_TYPE_ID = 1110;
 
 const STAGE_START = 'DT1110_74:NEW';
 const STAGE_IN_PROGRESS = 'DT1110_74:PREPARATION';
 const STAGE_DONE = 'DT1110_74:CLIENT';
 
-// ВНИМАНИЕ: Теперь поля называются в camelCase (как их отдает Битрикс)
-const FIELD_ORG = 'ufCrm66_1792116647';       // Учреждение
-const FIELD_ADDRESS = 'ufCrm66_1792116814';   // Адрес
-const FIELD_WEIGHT = 'ufCrm66_1792116834';    // Вес
-const FIELD_COMMENT = 'ufCrm66_1792116866';   // Комментарий
-const FIELD_DEADLINE = 'ufCrm66_1792116893';  // Срок исполнения
-const FIELD_PHOTO = 'ufCrm66_1792125123';     // Фото
+// ВНИМАНИЕ: Поля в camelCase
+const FIELD_ORG = 'ufCrm66_1792116647';
+const FIELD_ADDRESS = 'ufCrm66_1792116814';
+const FIELD_WEIGHT = 'ufCrm66_1792116834';
+const FIELD_COMMENT = 'ufCrm66_1792116866';
+const FIELD_DEADLINE = 'ufCrm66_1792116893';
+const FIELD_PHOTO = 'ufCrm66_1792125123';
 
 // ============================================================
 // УТИЛИТЫ
@@ -283,10 +332,8 @@ async function fetchUserNames(userIds) {
     }
 }
 
-// Функция для безопасного извлечения текста из массива или строки
 function extractText(field) {
     if (field === undefined || field === null || field === '') return '—';
-    
     if (Array.isArray(field)) {
         if (field.length === 0) return '—';
         return field.map(item => {
@@ -294,15 +341,10 @@ function extractText(field) {
             return item;
         }).filter(Boolean).join(', ') || '—';
     }
-    
-    if (typeof field === 'object') {
-        return field.VALUE || field.TEXT || '—';
-    }
-    
+    if (typeof field === 'object') return field.VALUE || field.TEXT || '—';
     return String(field);
 }
 
-// Функция для форматирования даты из ISO в ДД.ММ.ГГГГ
 function formatDate(field) {
     if (!field) return '—';
     let val = field;
@@ -343,9 +385,16 @@ async function loadItems() {
 
         const requests = items.filter(i => i.stageId === STAGE_START);
         const inProgress = items.filter(i => i.stageId === STAGE_IN_PROGRESS);
+        const done = items.filter(i => i.stageId === STAGE_DONE);
 
-        renderList('list-requests', requests, 'Нет заявок');
+        // Обновляем счетчики в заголовках
+        document.getElementById('badge-requests').textContent = requests.length;
+        document.getElementById('badge-progress').textContent = inProgress.length;
+        document.getElementById('badge-done').textContent = done.length;
+
+        renderList('list-requests', requests, 'Нет новых заявок');
         renderList('list-progress', inProgress, 'Нет заявок в исполнении');
+        renderList('list-done', done, 'Нет выполненных заявок');
 
         document.getElementById('loading').style.display = 'none';
         document.getElementById('content').style.display = 'block';
@@ -363,6 +412,10 @@ function renderList(containerId, items, emptyText) {
         container.innerHTML = '<div class="empty">' + emptyText + '</div>';
         return;
     }
+    
+    // Сортируем по ID (чтобы новые были ниже/выше, но порядок стабильный)
+    items.sort((a, b) => a.id - b.id);
+
     container.innerHTML = items.map(item => {
         const org = extractText(item[FIELD_ORG]);
         const deadline = formatDate(item[FIELD_DEADLINE]);
