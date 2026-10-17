@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Автомобили — Доставка</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f2f5;
+            color: #1a1a1a;
+            padding: 12px;
+            padding-bottom: 80px;
+        }
+        h2 {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 16px 0 8px;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        h2:first-of-type { margin-top: 0; }
+
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-bottom: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            cursor: pointer;
+            transition: transform 0.1s;
+            border-left: 4px solid transparent;
+        }
+        .card:active { transform: scale(0.98); }
+
+        /* Подсветка раздела «К исполнению» */
+        .in-progress .card {
+            border-left-color: #f5a623;
+            background: #fffdf5;
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+        .card-meta {
+            font-size: 13px;
+            color: #888;
+        }
+
+        /* Модальное окно карточки */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 100;
+            align-items: flex-end;
+            justify-content: center;
+        }
+        .modal-overlay.active { display: flex; }
+
+        .modal {
+            background: #fff;
+            width: 100%;
+            max-width: 600px;
+            max-height: 90vh;
+            border-radius: 20px 20px 0 0;
+            overflow-y: auto;
+            padding: 20px 16px 32px;
+            animation: slideUp 0.2s ease-out;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        .modal-close {
+            float: right;
+            background: #eee;
+            border: none;
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            font-size: 18px;
+            cursor: pointer;
+            line-height: 36px;
+            text-align: center;
+            color: #666;
+        }
+
+        .modal h3 {
+            font-size: 20px;
+            margin-bottom: 16px;
+            padding-right: 44px;
+        }
+
+        .field {
+            margin-bottom: 12px;
+        }
+        .field-label {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-bottom: 2px;
+        }
+        .field-value {
+            font-size: 15px;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+
+        .photo-preview {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+        .photo-preview img {
+            width: 72px; height: 72px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 80px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            font-size: 15px;
+            font-family: inherit;
+            resize: vertical;
+            margin-top: 4px;
+        }
+
+        .file-input-wrapper {
+            margin-top: 4px;
+        }
+        .file-input-wrapper input[type="file"] {
+            font-size: 14px;
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 16px;
+            transition: opacity 0.2s;
+        }
+        .btn:active { opacity: 0.7; }
+        .btn-primary {
+            background: #2d6cdf;
+            color: #fff;
+        }
+        .btn-success {
+            background: #28a745;
+            color: #fff;
+        }
+        .btn-secondary {
+            background: #e9ecef;
+            color: #333;
+            margin-top: 8px;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .refresh-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 56px; height: 56px;
+            border-radius: 50%;
+            background: #2d6cdf;
+            color: #fff;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(45,108,223,0.4);
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .refresh-btn:active { transform: scale(0.92); }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        .error-msg {
+            background: #fee;
+            color: #c00;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 12px 0;
+            font-size: 14px;
+        }
+        .empty {
+            text-align: center;
+            padding: 24px;
+            color: #aaa;
+            font-size: 14px;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            z-index: 200;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        .toast.show { opacity: 1; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div id="loading" class="loading">Загрузка заявок…</div>
+    <div id="error" class="error-msg" style="display:none;"></div>
+    <div id="content" style="display:none;">
+        <div id="section-requests">
+            <h2>Заявки</h2>
+            <div id="list-requests"></div>
+        </div>
+        <div id="section-progress" class="in-progress" style="margin-top: 20px;">
+            <h2>К исполнению</h2>
+            <div id="list-progress"></div>
+        </div>
+    </div>
+</div>
+
+<button class="refresh-btn" onclick="loadItems()" title="Обновить">⟳</button>
+
+<!-- Модальное окно карточки -->
+<div class="modal-overlay" id="modalOverlay">
+    <div class="modal" id="modalContent">
+        <!-- Заполняется динамически -->
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// НАСТРОЙКИ
+// ============================================================
+const WEBHOOK_URL = 'https://b24-964ige.bitrix24.ru/rest/1/ВАШ_КОД_ВЕБХУКА/';
+const ENTITY_TYPE_ID = 1110;
+
+// ID стадий смарт-процесса (из вашего запроса)
+const STAGE_START = 'DT1110_74:NEW';        // «Начало»
+const STAGE_IN_PROGRESS = 'DT1110_74:PREPARATION';  // «К исполнению»
+const STAGE_DONE = 'DT1110_74:CLIENT';      // «Выполнено»
+
+// Коды полей
+const FIELD_ORG = 'UF_CRM_66_1792116647';       // Учреждение
+const FIELD_ADDRESS = 'UF_CRM_66_1792116814';   // Адрес
+const FIELD_WEIGHT = 'UF_CRM_66_1792116834';    // Вес
+const FIELD_COMMENT = 'UF_CRM_66_1792116866';   // Комментарий
+const FIELD_DEADLINE = 'UF_CRM_66_1792116893';  // Срок исполнения
+const FIELD_DRIVER = 'UF_CRM_66_1792116928';    // Водитель (доп. поле)
+const FIELD_PHOTO = 'UF_CRM_66_1792125123';     // Фото (множественное)
+
+// ============================================================
+// УТИЛИТЫ
+// ============================================================
+let currentItemId = null;
+let usersCache = {}; // Кэш имен пользователей
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function apiCall(method, params = {}) {
+    const url = WEBHOOK_URL + method;
+    return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params)
+    }).then(r => r.json());
+}
+
+// Получаем имена пользователей по их ID
+async function fetchUserNames(userIds) {
+    const uncached = userIds.filter(id => id && !usersCache[id]);
+    if (uncached.length === 0) return;
+
+    try {
+        const res = await apiCall('user.get', {
+            filter: { ID: uncached }
+        });
+        if (res.result) {
+            res.result.forEach(user => {
+                usersCache[user.ID] = `${user.NAME} ${user.LAST_NAME}`.trim();
+            });
+        }
+    } catch (e) {
+        console.error("Ошибка загрузки пользователей", e);
+    }
+}
+
+// ============================================================
+// ЗАГРУЗКА СПИСКА
+// ============================================================
+async function loadItems() {
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('error').style.display = 'none';
+    document.getElementById('content').style.display = 'none';
+
+    try {
+        // Запрашиваем item.list вместе с assignedById
+        const res = await apiCall('crm.item.list', {
+            entityTypeId: ENTITY_TYPE_ID,
+            select: ['id', 'title', 'stageId', 'assignedById', FIELD_ORG, FIELD_DEADLINE],
+            order: { id: 'ASC' }
+        });
+
+        if (res.error) {
+            throw new Error(res.error_description || res.error);
+        }
+
+        const items = res.result?.items || [];
+
+        // Собираем уникальные ID ответственных и грузим их имена
+        const userIds = [...new Set(items.map(i => i.assignedById).filter(Boolean))];
+        await fetchUserNames(userIds);
+
+        const requests = items.filter(i => i.stageId === STAGE_START);
+        const inProgress = items.filter(i => i.stageId === STAGE_IN_PROGRESS);
+
+        renderList('list-requests', requests, 'Нет заявок');
+        renderList('list-progress', inProgress, 'Нет заявок в исполнении');
+
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+    } catch (e) {
+        document.getElementById('loading').style.display = 'none';
+        const errEl = document.getElementById('error');
+        errEl.style.display = 'block';
+        errEl.textContent = 'Ошибка загрузки: ' + e.message;
+    }
+}
+
+function renderList(containerId, items, emptyText) {
+    const container = document.getElementById(containerId);
+    if (items.length === 0) {
+        container.innerHTML = '<div class="empty">' + emptyText + '</div>';
+        return;
+    }
+    container.innerHTML = items.map(item => {
+        const org = item[FIELD_ORG] || '';
+        const deadline = item[FIELD_DEADLINE] || '';
+        // Получаем имя ответственного из кэша
+        const assignedName = usersCache[item.assignedById] || '';
+        
+        return `
+            <div class="card" onclick="openCard(${item.id})">
+                <div class="card-title">№${item.id} ${org}</div>
+                <div class="card-meta">
+                    ${deadline ? 'Срок: ' + deadline : ''}
+                    ${assignedName ? ' | ' + assignedName : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// ============================================================
+// КАРТОЧКА ЗАЯВКИ
+// ============================================================
+async function openCard(id) {
+    currentItemId = id;
+    const overlay = document.getElementById('modalOverlay');
+    const modal = document.getElementById('modalContent');
+    modal.innerHTML = '<div class="loading">Загрузка…</div>';
+    overlay.classList.add('active');
+
+    try {
+        const res = await apiCall('crm.item.get', {
+            entityTypeId: ENTITY_TYPE_ID,
+            id: id
+        });
+
+        if (res.error) throw new Error(res.error_description || res.error);
+
+        const item = res.result?.item;
+        if (!item) throw new Error('Заявка не найдена');
+
+        // Если ответственного ещё нет в кэше, подгружаем
+        if (item.assignedById && !usersCache[item.assignedById]) {
+            await fetchUserNames([item.assignedById]);
+        }
+        const assignedName = usersCache[item.assignedById] || 'Не назначен';
+
+        const isDone = item.stageId === STAGE_DONE;
+
+        // Извлекаем фото
+        let photosHtml = '';
+        const photos = item[FIELD_PHOTO];
+        if (Array.isArray(photos) && photos.length > 0) {
+            photosHtml = '<div class="photo-preview">' +
+                photos.map(f => {
+                    const url = f.url || f.downloadUrl || '';
+                    return url ? `<img src="${url}" alt="фото">` : '';
+                }).join('') +
+                '</div>';
+        }
+
+        modal.innerHTML = `
+            <button class="modal-close" onclick="closeModal()">✕</button>
+            <h3>№${item.id} ${item[FIELD_ORG] || ''}</h3>
+
+            <div class="field">
+                <div class="field-label">Адрес</div>
+                <div class="field-value">${item[FIELD_ADDRESS] || '—'}</div>
+            </div>
+            <div class="field">
+                <div class="field-label">Заказчик (Ответственный)</div>
+                <div class="field-value">${assignedName}</div>
+            </div>
+            <div class="field">
+                <div class="field-label">Комментарий</div>
+                <div class="field-value">${item[FIELD_COMMENT] || '—'}</div>
+            </div>
+            <div class="field">
+                <div class="field-label">Вес</div>
+                <div class="field-value">${item[FIELD_WEIGHT] || '—'}</div>
+            </div>
+            <div class="field">
+                <div class="field-label">Срок исполнения</div>
+                <div class="field-value">${item[FIELD_DEADLINE] || '—'}</div>
+            </div>
+
+            ${photosHtml ? '<div class="field"><div class="field-label">Фото</div>' + photosHtml + '</div>' : ''}
+
+            <hr style="border:none;border-top:1px solid #eee;margin:16px 0;">
+
+            <div class="field">
+                <div class="field-label">Добавить фото</div>
+                <div class="file-input-wrapper">
+                    <input type="file" id="photoInput" accept="image/*" multiple>
+                </div>
+            </div>
+
+            <div class="field">
+                <div class="field-label">Отчёт о доставке (необязательно)</div>
+                <textarea id="reportInput" placeholder="Введите отчёт…"></textarea>
+            </div>
+
+            <button class="btn btn-success" id="doneBtn" onclick="markDone()"
+                ${isDone ? 'disabled' : ''}>
+                ${isDone ? 'Уже выполнено' : 'Выполнено'}
+            </button>
+            <button class="btn btn-secondary" onclick="closeModal()">Закрыть</button>
+        `;
+    } catch (e) {
+        modal.innerHTML = `
+            <button class="modal-close" onclick="closeModal()">✕</button>
+            <div class="error-msg">Ошибка: ${e.message}</div>
+        `;
+    }
+}
+
+function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('active');
+    currentItemId = null;
+}
+
+// ============================================================
+// ЗАВЕРШЕНИЕ ЗАЯВКИ
+// ============================================================
+async function markDone() {
+    if (!currentItemId) return;
+
+    const btn = document.getElementById('doneBtn');
+    btn.disabled = true;
+    btn.textContent = 'Отправка…';
+
+    try {
+        // 1. Загрузка фото (если выбраны)
+        const photoInput = document.getElementById('photoInput');
+        if (photoInput && photoInput.files.length > 0) {
+            const fileDataArray = [];
+            for (const file of photoInput.files) {
+                const base64 = await fileToBase64(file);
+                fileDataArray.push([file.name, base64]);
+            }
+            const photoRes = await apiCall('crm.item.update', {
+                entityTypeId: ENTITY_TYPE_ID,
+                id: currentItemId,
+                fields: {
+                    [FIELD_PHOTO]: fileDataArray
+                }
+            });
+            if (photoRes.error) {
+                throw new Error('Фото: ' + (photoRes.error_description || photoRes.error));
+            }
+        }
+
+        // 2. Отчёт в таймлайн (если заполнен)
+        const report = document.getElementById('reportInput').value.trim();
+        if (report) {
+            const commentRes = await apiCall('crm.timeline.comment.add', {
+                fields: {
+                    ENTITY_ID: currentItemId,
+                    ENTITY_TYPE: 'DYNAMIC_' + ENTITY_TYPE_ID,
+                    COMMENT: report
+                }
+            });
+            if (commentRes.error) {
+                throw new Error('Отчёт: ' + (commentRes.error_description || commentRes.error));
+            }
+        }
+
+        // 3. Перевод на стадию «Выполнено»
+        const stageRes = await apiCall('crm.item.update', {
+            entityTypeId: ENTITY_TYPE_ID,
+            id: currentItemId,
+            fields: { stageId: STAGE_DONE }
+        });
+        if (stageRes.error) {
+            throw new Error('Стадия: ' + (stageRes.error_description || stageRes.error));
+        }
+
+        showToast('Заявка выполнена');
+        closeModal();
+        loadItems(); // обновляем список
+
+    } catch (e) {
+        showToast('Ошибка: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = 'Выполнено';
+    }
+}
+
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const base64 = reader.result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+// ============================================================
+// СТАРТ
+// ============================================================
+loadItems();
+</script>
+
+</body>
+</html>
