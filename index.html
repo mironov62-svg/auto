@@ -35,7 +35,6 @@
         }
         .card:active { transform: scale(0.98); }
 
-        /* Подсветка раздела «К исполнению» */
         .in-progress .card {
             border-left-color: #f5a623;
             background: #fffdf5;
@@ -51,7 +50,6 @@
             color: #888;
         }
 
-        /* Модальное окно карточки */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -97,9 +95,7 @@
             padding-right: 44px;
         }
 
-        .field {
-            margin-bottom: 12px;
-        }
+        .field { margin-bottom: 12px; }
         .field-label {
             font-size: 12px;
             color: #999;
@@ -138,12 +134,8 @@
             margin-top: 4px;
         }
 
-        .file-input-wrapper {
-            margin-top: 4px;
-        }
-        .file-input-wrapper input[type="file"] {
-            font-size: 14px;
-        }
+        .file-input-wrapper { margin-top: 4px; }
+        .file-input-wrapper input[type="file"] { font-size: 14px; }
 
         .btn {
             display: block;
@@ -158,19 +150,9 @@
             transition: opacity 0.2s;
         }
         .btn:active { opacity: 0.7; }
-        .btn-success {
-            background: #28a745;
-            color: #fff;
-        }
-        .btn-secondary {
-            background: #e9ecef;
-            color: #333;
-            margin-top: 8px;
-        }
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
+        .btn-success { background: #28a745; color: #fff; }
+        .btn-secondary { background: #e9ecef; color: #333; margin-top: 8px; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .refresh-btn {
             position: fixed;
@@ -191,11 +173,7 @@
         }
         .refresh-btn:active { transform: scale(0.92); }
 
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #999;
-        }
+        .loading { text-align: center; padding: 40px; color: #999; }
         .error-msg {
             background: #fee;
             color: #c00;
@@ -204,12 +182,7 @@
             margin: 12px 0;
             font-size: 14px;
         }
-        .empty {
-            text-align: center;
-            padding: 24px;
-            color: #aaa;
-            font-size: 14px;
-        }
+        .empty { text-align: center; padding: 24px; color: #aaa; font-size: 14px; }
 
         .toast {
             position: fixed;
@@ -248,40 +221,29 @@
 
 <button class="refresh-btn" onclick="loadItems()" title="Обновить">⟳</button>
 
-<!-- Модальное окно карточки -->
 <div class="modal-overlay" id="modalOverlay">
-    <div class="modal" id="modalContent">
-        <!-- Заполняется динамически -->
-    </div>
+    <div class="modal" id="modalContent"></div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
 // ============================================================
-// НАСТРОЙКИ
+// НАСТРОЙКИ (ВСТАВЬТЕ ВАШ НОВЫЙ ВЕБХУК НИЖЕ)
 // ============================================================
-// ВНИМАНИЕ: Для работы из браузера (CORS) этот URL должен быть либо:
-// 1. Входящим вебхуком (но они не поддерживают crm.item.list напрямую для возврата данных в fetch)
-// 2. Либо вы используете это внутри фрейма Битрикс24.
-// Для внешнего использования лучше использовать OAuth приложение или прокси.
-// Здесь предполагается, что используется Webhook с правами на чтение/запись CRM.
-const WEBHOOK_URL = 'https://b24-964ige.bitrix24.ru/rest/1/2e0ip1konlsrsobu/';
-
+const WEBHOOK_URL = 'https://b24-964ige.bitrix24.ru/rest/1/ХХХ/';
 const ENTITY_TYPE_ID = 1110;
 
-// ID стадий смарт-процесса
-const STAGE_START = 'DT1110_74:NEW';        // «Начало»
-const STAGE_IN_PROGRESS = 'DT1110_74:PREPARATION';  // «К исполнению»
-const STAGE_DONE = 'DT1110_74:CLIENT';      // «Выполнено»
+const STAGE_START = 'DT1110_74:NEW';
+const STAGE_IN_PROGRESS = 'DT1110_74:PREPARATION';
+const STAGE_DONE = 'DT1110_74:CLIENT';
 
-// Коды полей
-const FIELD_ORG = 'UF_CRM_66_1792116647';       // Учреждение
-const FIELD_ADDRESS = 'UF_CRM_66_1792116814';   // Адрес
-const FIELD_WEIGHT = 'UF_CRM_66_1792116834';    // Вес
-const FIELD_COMMENT = 'UF_CRM_66_1792116866';   // Комментарий
-const FIELD_DEADLINE = 'UF_CRM_66_1792116893';  // Срок исполнения
-const FIELD_PHOTO = 'UF_CRM_66_1792125123';     // Фото (множественное)
+const FIELD_ORG = 'UF_CRM_66_1792116647';
+const FIELD_ADDRESS = 'UF_CRM_66_1792116814';
+const FIELD_WEIGHT = 'UF_CRM_66_1792116834';
+const FIELD_COMMENT = 'UF_CRM_66_1792116866';
+const FIELD_DEADLINE = 'UF_CRM_66_1792116893';
+const FIELD_PHOTO = 'UF_CRM_66_1792125123';
 
 // ============================================================
 // УТИЛИТЫ
@@ -293,60 +255,42 @@ function showToast(msg) {
     const t = document.getElementById('toast');
     t.textContent = msg;
     t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
+    setTimeout(() => t.classList.remove('show'), 2000);
 }
 
-async function apiCall(method, params = {}) {
+// Возвращаем POST-запрос для стабильности
+function apiCall(method, params = {}) {
     const url = WEBHOOK_URL + method;
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(params)
-        });
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return await response.json();
-    } catch (error) {
-        console.error("API Call Error:", error);
-        throw error;
-    }
+    return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params)
+    }).then(r => r.json());
 }
 
 async function fetchUserNames(userIds) {
     const uncached = userIds.filter(id => id && !usersCache[id]);
     if (uncached.length === 0) return;
-    
-    // Убираем дубликаты
-    const uniqueIds = [...new Set(uncached)];
-    
     try {
-        // Разбиваем на группы по 50, если пользователей много
-        for (let i = 0; i < uniqueIds.length; i += 50) {
-            const batchIds = uniqueIds.slice(i, i + 50);
-            const res = await apiCall('user.get', { filter: { ID: batchIds } });
-            if (res.result) {
-                res.result.forEach(user => {
-                    usersCache[user.ID] = `${user.NAME} ${user.LAST_NAME}`.trim() || user.LOGIN;
-                });
-            }
+        const res = await apiCall('user.get', { filter: { ID: uncached } });
+        if (res.result) {
+            res.result.forEach(user => {
+                usersCache[user.ID] = `${user.NAME} ${user.LAST_NAME}`.trim();
+            });
         }
     } catch (e) {
         console.error("Ошибка загрузки пользователей", e);
     }
 }
 
-// Универсальный извлекатель текста из любых структур Битрикса
 function extractText(field) {
     if (field === undefined || field === null || field === '') return '—';
     
     if (Array.isArray(field)) {
         if (field.length === 0) return '—';
         return field.map(item => {
-            if (item === null || item === undefined) return '';
             if (typeof item === 'object') return item.VALUE || item.TEXT || '';
-            return String(item);
+            return item;
         }).filter(Boolean).join(', ') || '—';
     }
     
@@ -357,7 +301,6 @@ function extractText(field) {
     return String(field);
 }
 
-// Универсальный форматтер даты
 function formatDate(field) {
     if (!field) return '—';
     
@@ -368,7 +311,6 @@ function formatDate(field) {
     if (typeof val === 'string' && val.includes('T')) {
         try {
             const d = new Date(val);
-            if (isNaN(d.getTime())) return val;
             return d.toLocaleDateString('ru-RU');
         } catch (e) {
             return val;
@@ -389,13 +331,13 @@ async function loadItems() {
         const res = await apiCall('crm.item.list', {
             entityTypeId: ENTITY_TYPE_ID,
             select: ['id', 'title', 'stageId', 'assignedById', FIELD_ORG, FIELD_DEADLINE],
-            order: { id: 'DESC' } // Обычно новые сверху
+            order: { id: 'ASC' }
         });
 
         if (res.error) throw new Error(res.error_description || res.error);
 
         const items = res.result?.items || [];
-        const userIds = items.map(i => i.assignedById).filter(Boolean);
+        const userIds = [...new Set(items.map(i => i.assignedById).filter(Boolean))];
         await fetchUserNames(userIds);
 
         const requests = items.filter(i => i.stageId === STAGE_START);
@@ -411,7 +353,6 @@ async function loadItems() {
         const errEl = document.getElementById('error');
         errEl.style.display = 'block';
         errEl.textContent = 'Ошибка загрузки: ' + e.message;
-        console.error(e);
     }
 }
 
@@ -426,7 +367,6 @@ function renderList(containerId, items, emptyText) {
         const deadline = formatDate(item[FIELD_DEADLINE]);
         const assignedName = usersCache[item.assignedById] || '';
         
-        // Собираем строку мета-данных без лишних разделителей
         let metaParts = [];
         if (deadline !== '—') metaParts.push('Срок: ' + deadline);
         if (assignedName) metaParts.push(assignedName);
@@ -452,7 +392,6 @@ async function openCard(id) {
     overlay.classList.add('active');
 
     try {
-        // Явно запрашиваем ВСЕ поля для карточки
         const res = await apiCall('crm.item.get', {
             entityTypeId: ENTITY_TYPE_ID,
             id: id,
@@ -472,17 +411,14 @@ async function openCard(id) {
             await fetchUserNames([item.assignedById]);
         }
         const assignedName = usersCache[item.assignedById] || 'Не назначен';
-
         const isDone = item.stageId === STAGE_DONE;
 
-        // Извлекаем фото
         let photosHtml = '';
         const photos = item[FIELD_PHOTO];
         if (Array.isArray(photos) && photos.length > 0) {
             const photosList = photos.map(f => {
-                // Пробуем разные варианты названия поля URL
-                const url = f.url || f.downloadUrl || f.URL || f.SRC || '';
-                return url ? `<img src="${url}" alt="фото" onclick="window.open('${url}', '_blank')">` : '';
+                const url = f.url || f.downloadUrl || f.URL || '';
+                return url ? `<img src="${url}" alt="фото">` : '';
             }).filter(Boolean);
 
             if (photosList.length > 0) {
@@ -531,8 +467,7 @@ async function openCard(id) {
                 <textarea id="reportInput" placeholder="Введите отчёт…"></textarea>
             </div>
 
-            <button class="btn btn-success" id="doneBtn" onclick="markDone()"
-                ${isDone ? 'disabled' : ''}>
+            <button class="btn btn-success" id="doneBtn" onclick="markDone()" ${isDone ? 'disabled' : ''}>
                 ${isDone ? 'Уже выполнено' : 'Выполнено'}
             </button>
             <button class="btn btn-secondary" onclick="closeModal()">Закрыть</button>
@@ -557,7 +492,6 @@ async function markDone() {
     if (!currentItemId) return;
 
     const btn = document.getElementById('doneBtn');
-    const originalText = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'Отправка…';
 
@@ -568,22 +502,16 @@ async function markDone() {
             const fileDataArray = [];
             for (const file of photoInput.files) {
                 const base64 = await fileToBase64(file);
-                // Формат для UF-полей типа файл: [ [имя, base64], ... ]
                 fileDataArray.push([file.name, base64]);
             }
             
-            // Обновляем только поле с фото
             const photoRes = await apiCall('crm.item.update', {
                 entityTypeId: ENTITY_TYPE_ID,
                 id: currentItemId,
-                fields: {
-                    [FIELD_PHOTO]: fileDataArray
-                }
+                fields: { [FIELD_PHOTO]: fileDataArray }
             });
 
-            if (photoRes.error) {
-                throw new Error('Фото: ' + (photoRes.error_description || photoRes.error));
-            }
+            if (photoRes.error) throw new Error('Фото: ' + (photoRes.error_description || photoRes.error));
         }
 
         // 2. Отчёт в таймлайн
@@ -596,10 +524,7 @@ async function markDone() {
                     COMMENT: report
                 }
             });
-
-            if (commentRes.error) {
-                throw new Error('Отчёт: ' + (commentRes.error_description || commentRes.error));
-            }
+            if (commentRes.error) throw new Error('Отчёт: ' + (commentRes.error_description || commentRes.error));
         }
 
         // 3. Перевод на стадию «Выполнено»
@@ -608,10 +533,7 @@ async function markDone() {
             id: currentItemId,
             fields: { stageId: STAGE_DONE }
         });
-        
-        if (stageRes.error) {
-            throw new Error('Стадия: ' + (stageRes.error_description || stageRes.error));
-        }
+        if (stageRes.error) throw new Error('Стадия: ' + (stageRes.error_description || stageRes.error));
 
         showToast('Заявка выполнена');
         closeModal();
@@ -619,9 +541,8 @@ async function markDone() {
 
     } catch (e) {
         showToast('Ошибка: ' + e.message);
-        console.error(e);
         btn.disabled = false;
-        btn.textContent = originalText;
+        btn.textContent = 'Выполнено';
     }
 }
 
@@ -637,8 +558,7 @@ function fileToBase64(file) {
 // ============================================================
 // СТАРТ
 // ============================================================
-document.addEventListener('DOMContentLoaded', loadItems);
+loadItems();
 </script>
-
 </body>
 </html>
