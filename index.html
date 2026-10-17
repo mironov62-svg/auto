@@ -229,7 +229,7 @@
 
 <script>
 // ============================================================
-// НАСТРОЙКИ (ВСТАВЬТЕ ВАШ НОВЫЙ ВЕБХУК НИЖЕ)
+// НАСТРОЙКИ (ВСТАВЬТЕ ВАШ ВЕБХУК НИЖЕ)
 // ============================================================
 const WEBHOOK_URL = 'https://b24-964ige.bitrix24.ru/rest/1/2e0ip1konlsrsobu/';
 const ENTITY_TYPE_ID = 1110;
@@ -238,12 +238,13 @@ const STAGE_START = 'DT1110_74:NEW';
 const STAGE_IN_PROGRESS = 'DT1110_74:PREPARATION';
 const STAGE_DONE = 'DT1110_74:CLIENT';
 
-const FIELD_ORG = 'UF_CRM_66_1792116647';
-const FIELD_ADDRESS = 'UF_CRM_66_1792116814';
-const FIELD_WEIGHT = 'UF_CRM_66_1792116834';
-const FIELD_COMMENT = 'UF_CRM_66_1792116866';
-const FIELD_DEADLINE = 'UF_CRM_66_1792116893';
-const FIELD_PHOTO = 'UF_CRM_66_1792125123';
+// ВНИМАНИЕ: Теперь поля называются в camelCase (как их отдает Битрикс)
+const FIELD_ORG = 'ufCrm66_1792116647';       // Учреждение
+const FIELD_ADDRESS = 'ufCrm66_1792116814';   // Адрес
+const FIELD_WEIGHT = 'ufCrm66_1792116834';    // Вес
+const FIELD_COMMENT = 'ufCrm66_1792116866';   // Комментарий
+const FIELD_DEADLINE = 'ufCrm66_1792116893';  // Срок исполнения
+const FIELD_PHOTO = 'ufCrm66_1792125123';     // Фото
 
 // ============================================================
 // УТИЛИТЫ
@@ -258,7 +259,6 @@ function showToast(msg) {
     setTimeout(() => t.classList.remove('show'), 2000);
 }
 
-// Возвращаем POST-запрос для стабильности
 function apiCall(method, params = {}) {
     const url = WEBHOOK_URL + method;
     return fetch(url, {
@@ -283,6 +283,7 @@ async function fetchUserNames(userIds) {
     }
 }
 
+// Функция для безопасного извлечения текста из массива или строки
 function extractText(field) {
     if (field === undefined || field === null || field === '') return '—';
     
@@ -301,9 +302,9 @@ function extractText(field) {
     return String(field);
 }
 
+// Функция для форматирования даты из ISO в ДД.ММ.ГГГГ
 function formatDate(field) {
     if (!field) return '—';
-    
     let val = field;
     if (Array.isArray(val)) val = val[0];
     if (typeof val === 'object') val = val.VALUE || val.TEXT || '';
@@ -407,20 +408,69 @@ async function openCard(id) {
         const item = res.result?.item;
         if (!item) throw new Error('Заявка не найдена');
 
-        const debugData = {
-            "Учреждение": item[FIELD_ORG],
-            "Адрес": item[FIELD_ADDRESS],
-            "Вес": item[FIELD_WEIGHT],
-            "Комментарий": item[FIELD_COMMENT],
-            "Срок": item[FIELD_DEADLINE]
-        };
+        if (item.assignedById && !usersCache[item.assignedById]) {
+            await fetchUserNames([item.assignedById]);
+        }
+        const assignedName = usersCache[item.assignedById] || 'Не назначен';
+        const isDone = item.stageId === STAGE_DONE;
+
+        let photosHtml = '';
+        const photos = item[FIELD_PHOTO];
+        if (Array.isArray(photos) && photos.length > 0) {
+            const photosList = photos.map(f => {
+                const url = f.url || f.downloadUrl || f.URL || '';
+                return url ? `<img src="${url}" alt="фото">` : '';
+            }).filter(Boolean);
+
+            if (photosList.length > 0) {
+                photosHtml = '<div class="photo-preview">' + photosList.join('') + '</div>';
+            }
+        }
 
         modal.innerHTML = `
             <button class="modal-close" onclick="closeModal()">✕</button>
-            <h3>Данные из Битрикс (Заявка №${id})</h3>
-            
-            <div style="background:#f5f5f5; padding:10px; font-size:12px; overflow-x:auto; border-radius:8px; margin-bottom:15px; font-family:monospace; white-space:pre-wrap;">${JSON.stringify(debugData, null, 2)}</div>
+            <h3>№${item.id} ${extractText(item[FIELD_ORG]) !== '—' ? extractText(item[FIELD_ORG]) : ''}</h3>
 
+            <div class="field">
+                <div class="field-label">Адрес</div>
+                <div class="field-value">${extractText(item[FIELD_ADDRESS])}</div>
+            </div>
+            <div class="field">
+                <div class="field-label">Заказчик (Ответственный)</div>
+                <div class="field-value">${assignedName}</div>
+            </div>
+            <div class="field">
+                <div class="field-label">Комментарий</div>
+                <div class="field-value">${extractText(item[FIELD_COMMENT])}</div>
+            </div>
+            <div class="field">
+                <div class="field-label">Вес</div>
+                <div class="field-value">${extractText(item[FIELD_WEIGHT])}</div>
+            </div>
+            <div class="field">
+                <div class="field-label">Срок исполнения</div>
+                <div class="field-value">${formatDate(item[FIELD_DEADLINE])}</div>
+            </div>
+
+            ${photosHtml ? '<div class="field"><div class="field-label">Фото</div>' + photosHtml + '</div>' : ''}
+
+            <hr style="border:none;border-top:1px solid #eee;margin:16px 0;">
+
+            <div class="field">
+                <div class="field-label">Добавить фото</div>
+                <div class="file-input-wrapper">
+                    <input type="file" id="photoInput" accept="image/*" multiple>
+                </div>
+            </div>
+
+            <div class="field">
+                <div class="field-label">Отчёт о доставке (необязательно)</div>
+                <textarea id="reportInput" placeholder="Введите отчёт…"></textarea>
+            </div>
+
+            <button class="btn btn-success" id="doneBtn" onclick="markDone()" ${isDone ? 'disabled' : ''}>
+                ${isDone ? 'Уже выполнено' : 'Выполнено'}
+            </button>
             <button class="btn btn-secondary" onclick="closeModal()">Закрыть</button>
         `;
     } catch (e) {
@@ -447,7 +497,6 @@ async function markDone() {
     btn.textContent = 'Отправка…';
 
     try {
-        // 1. Загрузка фото
         const photoInput = document.getElementById('photoInput');
         if (photoInput && photoInput.files.length > 0) {
             const fileDataArray = [];
@@ -465,7 +514,6 @@ async function markDone() {
             if (photoRes.error) throw new Error('Фото: ' + (photoRes.error_description || photoRes.error));
         }
 
-        // 2. Отчёт в таймлайн
         const report = document.getElementById('reportInput').value.trim();
         if (report) {
             const commentRes = await apiCall('crm.timeline.comment.add', {
@@ -478,7 +526,6 @@ async function markDone() {
             if (commentRes.error) throw new Error('Отчёт: ' + (commentRes.error_description || commentRes.error));
         }
 
-        // 3. Перевод на стадию «Выполнено»
         const stageRes = await apiCall('crm.item.update', {
             entityTypeId: ENTITY_TYPE_ID,
             id: currentItemId,
