@@ -454,7 +454,9 @@ async function openCard(id) {
             select: [
                 'id', 'title', 'stageId', 'assignedById', 
                 FIELD_ORG, FIELD_ADDRESS, FIELD_WEIGHT, 
-                FIELD_COMMENT, FIELD_DEADLINE, FIELD_PHOTO, FIELD_DRIVER
+                FIELD_COMMENT, FIELD_DEADLINE, FIELD_PHOTO, 
+                FIELD_DRIVER, 
+                'ufCrm66_1792123436' // Поле "Факт выполнения"
             ]
         });
 
@@ -463,7 +465,7 @@ async function openCard(id) {
         const item = res.result?.item;
         if (!item) throw new Error('Заявка не найдена');
 
-        // Подгружаем имена, если их нет в кэше
+        // Подгружаем имена
         const uIds = [];
         if (item.assignedById) uIds.push(item.assignedById);
         if (item[FIELD_DRIVER]) uIds.push(item[FIELD_DRIVER]);
@@ -471,8 +473,13 @@ async function openCard(id) {
 
         const assignedName = usersCache[item.assignedById] || 'Не назначен';
         const driverName = usersCache[item[FIELD_DRIVER]] || 'Не назначен';
-        const isDone = item.stageId === STAGE_DONE;
 
+        // Определяем стадию
+        const isStart = item.stageId === STAGE_START;           // Новая
+        const isInProgress = item.stageId === STAGE_IN_PROGRESS; // К исполнению
+        const isDone = item.stageId === STAGE_DONE;             // Выполнено
+
+        // Вывод фото (если есть)
         let photosHtml = '';
         const photos = item[FIELD_PHOTO];
         if (Array.isArray(photos) && photos.length > 0) {
@@ -484,6 +491,41 @@ async function openCard(id) {
             if (photosList.length > 0) {
                 photosHtml = '<div class="photo-preview">' + photosList.join('') + '</div>';
             }
+        }
+
+        // Блок для стадии "К исполнению" (Фото + Отчет)
+        let actionBlockHtml = '';
+        if (isInProgress) {
+            actionBlockHtml = `
+                <hr style="border:none;border-top:1px solid #eee;margin:16px 0;">
+                <div class="field">
+                    <div class="field-label">Добавить фото</div>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="photoInput" accept="image/*" multiple>
+                    </div>
+                </div>
+                <div class="field">
+                    <div class="field-label">Отчёт о доставке (необязательно)</div>
+                    <textarea id="reportInput" placeholder="Введите отчёт…"></textarea>
+                </div>
+                <button class="btn btn-success" id="doneBtn" onclick="markDone()">
+                    Выполнено
+                </button>
+            `;
+        }
+
+        // Блок для стадии "Выполнено" (Факт выполнения)
+        let factBlockHtml = '';
+        if (isDone) {
+            const factTime = formatDate(item['ufCrm66_1792123436']);
+            factBlockHtml = `
+                <hr style="border:none;border-top:1px solid #eee;margin:16px 0;">
+                <div class="field" style="background:#e8f5e9; padding:12px; border-radius:8px;">
+                    <div class="field-label" style="color:#2e7d32;">Факт выполнения</div>
+                    <div class="field-value" style="font-weight:600; color:#2e7d32;">${factTime !== '—' ? factTime : 'Дата не указана'}</div>
+                </div>
+                <button class="btn btn-secondary" disabled>Заявка завершена</button>
+            `;
         }
 
         modal.innerHTML = `
@@ -515,26 +557,12 @@ async function openCard(id) {
                 <div class="field-value">${formatDate(item[FIELD_DEADLINE])}</div>
             </div>
 
-            ${photosHtml ? '<div class="field"><div class="field-label">Фото</div>' + photosHtml + '</div>' : ''}
+            ${photosHtml ? '<div class="field"><div class="field-label">Прикрепленные фото</div>' + photosHtml + '</div>' : ''}
 
-            <hr style="border:none;border-top:1px solid #eee;margin:16px 0;">
+            ${actionBlockHtml}
+            ${factBlockHtml}
 
-            <div class="field">
-                <div class="field-label">Добавить фото</div>
-                <div class="file-input-wrapper">
-                    <input type="file" id="photoInput" accept="image/*" multiple>
-                </div>
-            </div>
-
-            <div class="field">
-                <div class="field-label">Отчёт о доставке (необязательно)</div>
-                <textarea id="reportInput" placeholder="Введите отчёт…"></textarea>
-            </div>
-
-            <button class="btn btn-success" id="doneBtn" onclick="markDone()" ${isDone ? 'disabled' : ''}>
-                ${isDone ? 'Уже выполнено' : 'Выполнено'}
-            </button>
-            <button class="btn btn-secondary" onclick="closeModal()">Закрыть</button>
+            <button class="btn btn-secondary" onclick="closeModal()" style="${isInProgress ? 'margin-top: 8px;' : 'margin-top: 16px;'}">Закрыть</button>
         `;
     } catch (e) {
         modal.innerHTML = `
