@@ -12,7 +12,7 @@
             background: #f0f2f5;
             color: #1a1a1a;
             padding: 12px;
-            padding-bottom: 80px; /* Отступ для кнопки снизу */
+            padding-bottom: 30px;
         }
 
         /* Шапка с кнопкой обновления */
@@ -238,9 +238,8 @@
 <body>
 
 <div id="app">
-    <!-- Шапка с кнопкой обновления -->
     <div class="header-bar">
-        <div class="header-title">Мои заявки</div>
+        <div class="header-title">Заявки</div>
         <button class="refresh-btn-text" onclick="loadItems()">
             <span style="font-size:16px;">⟳</span> Обновить
         </button>
@@ -250,19 +249,16 @@
     <div id="error" class="error-msg" style="display:none;"></div>
     
     <div id="content" style="display:none;">
-        <!-- Новые заявки -->
         <div id="section-requests">
-            <h2>Заявки <span class="badge" id="badge-requests">0</span></h2>
+            <h2>Новые <span class="badge" id="badge-requests">0</span></h2>
             <div id="list-requests"></div>
         </div>
 
-        <!-- В работе -->
         <div id="section-progress">
             <h2>К исполнению <span class="badge" id="badge-progress">0</span></h2>
             <div id="list-progress"></div>
         </div>
 
-        <!-- Выполненные -->
         <div id="section-done">
             <h2>Выполнено <span class="badge" id="badge-done">0</span></h2>
             <div id="list-done"></div>
@@ -278,7 +274,7 @@
 
 <script>
 // ============================================================
-// НАСТРОЙКИ (ВСТАВЬТЕ ВАШ ВЕБХУК НИЖЕ)
+// НАСТРОЙКИ
 // ============================================================
 const WEBHOOK_URL = 'https://b24-964ige.bitrix24.ru/rest/1/2e0ip1konlsrsobu/';
 const ENTITY_TYPE_ID = 1110;
@@ -287,7 +283,6 @@ const STAGE_START = 'DT1110_74:NEW';
 const STAGE_IN_PROGRESS = 'DT1110_74:PREPARATION';
 const STAGE_DONE = 'DT1110_74:CLIENT';
 
-// ВНИМАНИЕ: Поля в camelCase
 const FIELD_ORG = 'ufCrm66_1792116647';
 const FIELD_ADDRESS = 'ufCrm66_1792116814';
 const FIELD_WEIGHT = 'ufCrm66_1792116834';
@@ -371,10 +366,12 @@ async function loadItems() {
     document.getElementById('content').style.display = 'none';
 
     try {
+        // ВАЖНО: добавили 'ALL', чтобы подтянулись выполненные
         const res = await apiCall('crm.item.list', {
             entityTypeId: ENTITY_TYPE_ID,
             select: ['id', 'title', 'stageId', 'assignedById', FIELD_ORG, FIELD_DEADLINE],
-            order: { id: 'ASC' }
+            order: { id: 'ASC' },
+            filter: { stageId: [STAGE_START, STAGE_IN_PROGRESS, STAGE_DONE] }
         });
 
         if (res.error) throw new Error(res.error_description || res.error);
@@ -387,7 +384,6 @@ async function loadItems() {
         const inProgress = items.filter(i => i.stageId === STAGE_IN_PROGRESS);
         const done = items.filter(i => i.stageId === STAGE_DONE);
 
-        // Обновляем счетчики в заголовках
         document.getElementById('badge-requests').textContent = requests.length;
         document.getElementById('badge-progress').textContent = inProgress.length;
         document.getElementById('badge-done').textContent = done.length;
@@ -413,7 +409,6 @@ function renderList(containerId, items, emptyText) {
         return;
     }
     
-    // Сортируем по ID (чтобы новые были ниже/выше, но порядок стабильный)
     items.sort((a, b) => a.id - b.id);
 
     container.innerHTML = items.map(item => {
