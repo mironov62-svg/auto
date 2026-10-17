@@ -500,20 +500,27 @@ async function openCard(id) {
 
         let factBlockHtml = '';
         if (isDone) {
-            // ФОРМАТИРУЕМ ФАКТ ВЫПОЛНЕНИЯ: ДД.ММ.ГГГГ ЧЧ:ММ
+            // Берем время ровно в том виде, в котором оно пришло из Битрикс24
             let factVal = item['ufCrm66_1792123436'];
             let factTime = 'Дата не указана';
             
             if (factVal) {
                 if (Array.isArray(factVal)) factVal = factVal[0];
+                
                 if (typeof factVal === 'string' && factVal.includes('T')) {
-                    const d = new Date(factVal);
-                    const day = String(d.getDate()).padStart(2, '0');
-                    const month = String(d.getMonth() + 1).padStart(2, '0');
-                    const year = d.getFullYear();
-                    const hours = String(d.getHours()).padStart(2, '0');
-                    const minutes = String(d.getMinutes()).padStart(2, '0');
-                    factTime = `${day}.${month}.${year} ${hours}:${minutes}`;
+                    // Разбиваем строку "2026-10-17T20:41:01+03:00" по букве T
+                    const parts = factVal.split('T');
+                    const datePart = parts[0]; // "2026-10-17"
+                    const timePart = parts[1]; // "20:41:01+03:00"
+                    
+                    // Переворачиваем дату в ДД.ММ.ГГГГ
+                    const d = datePart.split('-'); // ["2026", "10", "17"]
+                    const formattedDate = `${d[2]}.${d[1]}.${d[0]}`;
+                    
+                    // Берем только часы и минуты из времени
+                    const formattedTime = timePart.substring(0, 5); // "20:41"
+                    
+                    factTime = `${formattedDate} ${formattedTime}`;
                 } else if (factVal) {
                     factTime = factVal;
                 }
