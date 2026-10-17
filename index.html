@@ -455,9 +455,8 @@ async function openCard(id) {
             select: [
                 'id', 'title', 'stageId', 'assignedById', 
                 FIELD_ORG, FIELD_ADDRESS, FIELD_WEIGHT, 
-                FIELD_COMMENT, FIELD_DEADLINE, FIELD_PHOTO, 
-                FIELD_DRIVER, 
-                'ufCrm66_1792123436' // Поле "Факт выполнения"
+                FIELD_COMMENT, FIELD_DEADLINE, FIELD_DRIVER, 
+                'ufCrm66_1792123436' // Факт выполнения
             ]
         });
 
@@ -475,26 +474,10 @@ async function openCard(id) {
         const assignedName = usersCache[item.assignedById] || 'Не назначен';
         const driverName = usersCache[item[FIELD_DRIVER]] || 'Не назначен';
 
-        // Определяем стадию
-        const isStart = item.stageId === STAGE_START;           // Новая
-        const isInProgress = item.stageId === STAGE_IN_PROGRESS; // К исполнению
-        const isDone = item.stageId === STAGE_DONE;             // Выполнено
+        const isInProgress = item.stageId === STAGE_IN_PROGRESS;
+        const isDone = item.stageId === STAGE_DONE;
 
-        // Вывод фото (если есть)
-        let photosHtml = '';
-        const photos = item[FIELD_PHOTO];
-        if (Array.isArray(photos) && photos.length > 0) {
-            const photosList = photos.map(f => {
-                const url = f.url || f.downloadUrl || f.URL || '';
-                return url ? `<img src="${url}" alt="фото">` : '';
-            }).filter(Boolean);
-
-            if (photosList.length > 0) {
-                photosHtml = '<div class="photo-preview">' + photosList.join('') + '</div>';
-            }
-        }
-
-        // Блок для стадии "К исполнению" (Фото + Отчет)
+        // Блок для стадии "К исполнению"
         let actionBlockHtml = '';
         if (isInProgress) {
             actionBlockHtml = `
@@ -515,7 +498,7 @@ async function openCard(id) {
             `;
         }
 
-        // Блок для стадии "Выполнено" (Факт выполнения)
+        // Блок для стадии "Выполнено"
         let factBlockHtml = '';
         if (isDone) {
             const factTime = formatDate(item['ufCrm66_1792123436']);
@@ -557,8 +540,6 @@ async function openCard(id) {
                 <div class="field-label">Срок исполнения</div>
                 <div class="field-value">${formatDate(item[FIELD_DEADLINE])}</div>
             </div>
-
-            ${photosHtml ? '<div class="field"><div class="field-label">Прикрепленные фото</div>' + photosHtml + '</div>' : ''}
 
             ${actionBlockHtml}
             ${factBlockHtml}
