@@ -158,10 +158,6 @@
             transition: opacity 0.2s;
         }
         .btn:active { opacity: 0.7; }
-        .btn-primary {
-            background: #2d6cdf;
-            color: #fff;
-        }
         .btn-success {
             background: #28a745;
             color: #fff;
@@ -265,10 +261,16 @@
 // ============================================================
 // НАСТРОЙКИ
 // ============================================================
-const WEBHOOK_URL = 'https://b24-964ige.bitrix24.ru/rest/1/2e0ip1konlsrsobu/';
+// ВНИМАНИЕ: Для работы из браузера (CORS) этот URL должен быть либо:
+// 1. Входящим вебхуком (но они не поддерживают crm.item.list напрямую для возврата данных в fetch)
+// 2. Либо вы используете это внутри фрейма Битрикс24.
+// Для внешнего использования лучше использовать OAuth приложение или прокси.
+// Здесь предполагается, что используется Webhook с правами на чтение/запись CRM.
+const WEBHOOK_URL = 'https://b24-964ige.bitrix24.ru/rest/1/YOUR_WEBHOOK_CODE_HERE/';
+
 const ENTITY_TYPE_ID = 1110;
 
-// ID стадий смарт-процесса (из вашего запроса)
+// ID стадий смарт-процесса
 const STAGE_START = 'DT1110_74:NEW';        // «Начало»
 const STAGE_IN_PROGRESS = 'DT1110_74:PREPARATION';  // «К исполнению»
 const STAGE_DONE = 'DT1110_74:CLIENT';      // «Выполнено»
@@ -279,48 +281,100 @@ const FIELD_ADDRESS = 'UF_CRM_66_1792116814';   // Адрес
 const FIELD_WEIGHT = 'UF_CRM_66_1792116834';    // Вес
 const FIELD_COMMENT = 'UF_CRM_66_1792116866';   // Комментарий
 const FIELD_DEADLINE = 'UF_CRM_66_1792116893';  // Срок исполнения
-const FIELD_DRIVER = 'UF_CRM_66_1792116928';    // Водитель (доп. поле)
 const FIELD_PHOTO = 'UF_CRM_66_1792125123';     // Фото (множественное)
 
 // ============================================================
 // УТИЛИТЫ
 // ============================================================
 let currentItemId = null;
-let usersCache = {}; // Кэш имен пользователей
+let usersCache = {}; 
 
 function showToast(msg) {
     const t = document.getElementById('toast');
     t.textContent = msg;
     t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 2000);
+    setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-function apiCall(method, params = {}) {
+async function apiCall(method, params = {}) {
     const url = WEBHOOK_URL + method;
-    return fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params)
-    }).then(r => r.json());
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.error("API Call Error:", error);
+        throw error;
+    }
 }
 
-// Получаем имена пользователей по их ID
 async function fetchUserNames(userIds) {
     const uncached = userIds.filter(id => id && !usersCache[id]);
     if (uncached.length === 0) return;
-
+    
+    // Убираем дубликаты
+    const uniqueIds = [...new Set(uncached)];
+    
     try {
-        const res = await apiCall('user.get', {
-            filter: { ID: uncached }
-        });
-        if (res.result) {
-            res.result.forEach(user => {
-                usersCache[user.ID] = `${user.NAME} ${user.LAST_NAME}`.trim();
-            });
+        // Разбиваем на группы по 50, если пользователей много
+        for (let i = 0; i < uniqueIds.length; i += 50) {
+            const batchIds = uniqueIds.slice(i, i + 50);
+            const res = await apiCall('user.get', { filter: { ID: batchIds } });
+            if (res.result) {
+                res.result.forEach(user => {
+                    usersCache[user.ID] = `${user.NAME} ${user.LAST_NAME}`.trim() || user.LOGIN;
+                });
+            }
         }
     } catch (e) {
         console.error("Ошибка загрузки пользователей", e);
     }
+}
+
+// Универсальный извлекатель текста из любых структур Битрикса
+function extractText(field) {
+    if (field === undefined || field === null || field === '') return '—';
+    
+    if (Array.isArray(field)) {
+        if (field.length === 0) return '—';
+        return field.map(item => {
+            if (item === null || item === undefined) return '';
+            if (typeof item === 'object') return item.VALUE || item.TEXT || '';
+            return String(item);
+        }).filter(Boolean).join(', ') || '—';
+    }
+    
+    if (typeof field === 'object') {
+        return field.VALUE || field.TEXT || '—';
+    }
+    
+    return String(field);
+}
+
+// Универсальный форматтер даты
+function formatDate(field) {
+    if (!field) return '—';
+    
+    let val = field;
+    if (Array.isArray(val)) val = val[0];
+    if (typeof val === 'object') val = val.VALUE || val.TEXT || '';
+
+    if (typeof val === 'string' && val.includes('T')) {
+        try {
+            const d = new Date(val);
+            if (isNaN(d.getTime())) return val;
+            return d.toLocaleDateString('ru-RU');
+        } catch (e) {
+            return val;
+        }
+    }
+    return val || '—';
 }
 
 // ============================================================
@@ -332,21 +386,16 @@ async function loadItems() {
     document.getElementById('content').style.display = 'none';
 
     try {
-        // Запрашиваем item.list вместе с assignedById
         const res = await apiCall('crm.item.list', {
             entityTypeId: ENTITY_TYPE_ID,
             select: ['id', 'title', 'stageId', 'assignedById', FIELD_ORG, FIELD_DEADLINE],
-            order: { id: 'ASC' }
+            order: { id: 'DESC' } // Обычно новые сверху
         });
 
-        if (res.error) {
-            throw new Error(res.error_description || res.error);
-        }
+        if (res.error) throw new Error(res.error_description || res.error);
 
         const items = res.result?.items || [];
-
-        // Собираем уникальные ID ответственных и грузим их имена
-        const userIds = [...new Set(items.map(i => i.assignedById).filter(Boolean))];
+        const userIds = items.map(i => i.assignedById).filter(Boolean);
         await fetchUserNames(userIds);
 
         const requests = items.filter(i => i.stageId === STAGE_START);
@@ -362,6 +411,7 @@ async function loadItems() {
         const errEl = document.getElementById('error');
         errEl.style.display = 'block';
         errEl.textContent = 'Ошибка загрузки: ' + e.message;
+        console.error(e);
     }
 }
 
@@ -372,18 +422,20 @@ function renderList(containerId, items, emptyText) {
         return;
     }
     container.innerHTML = items.map(item => {
-        const org = item[FIELD_ORG] || '';
-        const deadline = item[FIELD_DEADLINE] || '';
-        // Получаем имя ответственного из кэша
+        const org = extractText(item[FIELD_ORG]);
+        const deadline = formatDate(item[FIELD_DEADLINE]);
         const assignedName = usersCache[item.assignedById] || '';
         
+        // Собираем строку мета-данных без лишних разделителей
+        let metaParts = [];
+        if (deadline !== '—') metaParts.push('Срок: ' + deadline);
+        if (assignedName) metaParts.push(assignedName);
+        const metaStr = metaParts.join(' | ');
+
         return `
             <div class="card" onclick="openCard(${item.id})">
-                <div class="card-title">№${item.id} ${org}</div>
-                <div class="card-meta">
-                    ${deadline ? 'Срок: ' + deadline : ''}
-                    ${assignedName ? ' | ' + assignedName : ''}
-                </div>
+                <div class="card-title">№${item.id} ${org !== '—' ? org : ''}</div>
+                <div class="card-meta">${metaStr}</div>
             </div>
         `;
     }).join('');
@@ -400,9 +452,15 @@ async function openCard(id) {
     overlay.classList.add('active');
 
     try {
+        // Явно запрашиваем ВСЕ поля для карточки
         const res = await apiCall('crm.item.get', {
             entityTypeId: ENTITY_TYPE_ID,
-            id: id
+            id: id,
+            select: [
+                'id', 'title', 'stageId', 'assignedById', 
+                FIELD_ORG, FIELD_ADDRESS, FIELD_WEIGHT, 
+                FIELD_COMMENT, FIELD_DEADLINE, FIELD_PHOTO
+            ]
         });
 
         if (res.error) throw new Error(res.error_description || res.error);
@@ -410,7 +468,6 @@ async function openCard(id) {
         const item = res.result?.item;
         if (!item) throw new Error('Заявка не найдена');
 
-        // Если ответственного ещё нет в кэше, подгружаем
         if (item.assignedById && !usersCache[item.assignedById]) {
             await fetchUserNames([item.assignedById]);
         }
@@ -422,21 +479,24 @@ async function openCard(id) {
         let photosHtml = '';
         const photos = item[FIELD_PHOTO];
         if (Array.isArray(photos) && photos.length > 0) {
-            photosHtml = '<div class="photo-preview">' +
-                photos.map(f => {
-                    const url = f.url || f.downloadUrl || '';
-                    return url ? `<img src="${url}" alt="фото">` : '';
-                }).join('') +
-                '</div>';
+            const photosList = photos.map(f => {
+                // Пробуем разные варианты названия поля URL
+                const url = f.url || f.downloadUrl || f.URL || f.SRC || '';
+                return url ? `<img src="${url}" alt="фото" onclick="window.open('${url}', '_blank')">` : '';
+            }).filter(Boolean);
+
+            if (photosList.length > 0) {
+                photosHtml = '<div class="photo-preview">' + photosList.join('') + '</div>';
+            }
         }
 
         modal.innerHTML = `
             <button class="modal-close" onclick="closeModal()">✕</button>
-            <h3>№${item.id} ${item[FIELD_ORG] || ''}</h3>
+            <h3>№${item.id} ${extractText(item[FIELD_ORG]) !== '—' ? extractText(item[FIELD_ORG]) : ''}</h3>
 
             <div class="field">
                 <div class="field-label">Адрес</div>
-                <div class="field-value">${item[FIELD_ADDRESS] || '—'}</div>
+                <div class="field-value">${extractText(item[FIELD_ADDRESS])}</div>
             </div>
             <div class="field">
                 <div class="field-label">Заказчик (Ответственный)</div>
@@ -444,15 +504,15 @@ async function openCard(id) {
             </div>
             <div class="field">
                 <div class="field-label">Комментарий</div>
-                <div class="field-value">${item[FIELD_COMMENT] || '—'}</div>
+                <div class="field-value">${extractText(item[FIELD_COMMENT])}</div>
             </div>
             <div class="field">
                 <div class="field-label">Вес</div>
-                <div class="field-value">${item[FIELD_WEIGHT] || '—'}</div>
+                <div class="field-value">${extractText(item[FIELD_WEIGHT])}</div>
             </div>
             <div class="field">
                 <div class="field-label">Срок исполнения</div>
-                <div class="field-value">${item[FIELD_DEADLINE] || '—'}</div>
+                <div class="field-value">${formatDate(item[FIELD_DEADLINE])}</div>
             </div>
 
             ${photosHtml ? '<div class="field"><div class="field-label">Фото</div>' + photosHtml + '</div>' : ''}
@@ -497,18 +557,22 @@ async function markDone() {
     if (!currentItemId) return;
 
     const btn = document.getElementById('doneBtn');
+    const originalText = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'Отправка…';
 
     try {
-        // 1. Загрузка фото (если выбраны)
+        // 1. Загрузка фото
         const photoInput = document.getElementById('photoInput');
         if (photoInput && photoInput.files.length > 0) {
             const fileDataArray = [];
             for (const file of photoInput.files) {
                 const base64 = await fileToBase64(file);
+                // Формат для UF-полей типа файл: [ [имя, base64], ... ]
                 fileDataArray.push([file.name, base64]);
             }
+            
+            // Обновляем только поле с фото
             const photoRes = await apiCall('crm.item.update', {
                 entityTypeId: ENTITY_TYPE_ID,
                 id: currentItemId,
@@ -516,12 +580,13 @@ async function markDone() {
                     [FIELD_PHOTO]: fileDataArray
                 }
             });
+
             if (photoRes.error) {
                 throw new Error('Фото: ' + (photoRes.error_description || photoRes.error));
             }
         }
 
-        // 2. Отчёт в таймлайн (если заполнен)
+        // 2. Отчёт в таймлайн
         const report = document.getElementById('reportInput').value.trim();
         if (report) {
             const commentRes = await apiCall('crm.timeline.comment.add', {
@@ -531,6 +596,7 @@ async function markDone() {
                     COMMENT: report
                 }
             });
+
             if (commentRes.error) {
                 throw new Error('Отчёт: ' + (commentRes.error_description || commentRes.error));
             }
@@ -542,28 +608,27 @@ async function markDone() {
             id: currentItemId,
             fields: { stageId: STAGE_DONE }
         });
+        
         if (stageRes.error) {
             throw new Error('Стадия: ' + (stageRes.error_description || stageRes.error));
         }
 
         showToast('Заявка выполнена');
         closeModal();
-        loadItems(); // обновляем список
+        loadItems(); 
 
     } catch (e) {
         showToast('Ошибка: ' + e.message);
+        console.error(e);
         btn.disabled = false;
-        btn.textContent = 'Выполнено';
+        btn.textContent = originalText;
     }
 }
 
 function fileToBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = () => {
-            const base64 = reader.result.split(',')[1];
-            resolve(base64);
-        };
+        reader.onload = () => resolve(reader.result.split(',')[1]);
         reader.onerror = reject;
         reader.readAsDataURL(file);
     });
@@ -572,7 +637,7 @@ function fileToBase64(file) {
 // ============================================================
 // СТАРТ
 // ============================================================
-loadItems();
+document.addEventListener('DOMContentLoaded', loadItems);
 </script>
 
 </body>
