@@ -347,15 +347,10 @@ function formatDate(field) {
     if (typeof val === 'string' && val.includes('T')) {
         try {
             const d = new Date(val);
-            // Получаем дату в формате ДД.ММ.ГГГГ
-            const dateStr = d.toLocaleDateString('ru-RU');
-            
-            // Получаем время в формате ЧЧ:ММ:СС
-            const timeStr = d.toLocaleTimeString('ru-RU', { hour12: false });
-            
-            // Если время не нужно (для срока исполнения), функция formatDate сама поймет это по контексту,
-            // но чтобы не ломать поле "Срок", мы будем возвращать время только для поля "Факт выполнения".
-            return `${dateStr} ${timeStr}`;
+            // Возвращаем только день и месяц (например, 20.10)
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            return `${day}.${month}`;
         } catch (e) {
             return val;
         }
