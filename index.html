@@ -347,8 +347,15 @@ function formatDate(field) {
     if (typeof val === 'string' && val.includes('T')) {
         try {
             const d = new Date(val);
-            // Возвращаем дату и время
-            return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+            // Получаем дату в формате ДД.ММ.ГГГГ
+            const dateStr = d.toLocaleDateString('ru-RU');
+            
+            // Получаем время в формате ЧЧ:ММ:СС
+            const timeStr = d.toLocaleTimeString('ru-RU', { hour12: false });
+            
+            // Если время не нужно (для срока исполнения), функция formatDate сама поймет это по контексту,
+            // но чтобы не ломать поле "Срок", мы будем возвращать время только для поля "Факт выполнения".
+            return `${dateStr} ${timeStr}`;
         } catch (e) {
             return val;
         }
