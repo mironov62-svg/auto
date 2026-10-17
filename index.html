@@ -467,7 +467,6 @@ async function openCard(id) {
         const item = res.result?.item;
         if (!item) throw new Error('Заявка не найдена');
 
-        // Подгружаем имена
         const uIds = [];
         if (item.assignedById) uIds.push(item.assignedById);
         if (item[FIELD_DRIVER]) uIds.push(item[FIELD_DRIVER]);
@@ -479,7 +478,6 @@ async function openCard(id) {
         const isInProgress = item.stageId === STAGE_IN_PROGRESS;
         const isDone = item.stageId === STAGE_DONE;
 
-        // Блок для стадии "К исполнению"
         let actionBlockHtml = '';
         if (isInProgress) {
             actionBlockHtml = `
@@ -500,15 +498,32 @@ async function openCard(id) {
             `;
         }
 
-        // Блок для стадии "Выполнено"
         let factBlockHtml = '';
         if (isDone) {
-            const factTime = formatDate(item['ufCrm66_1792123436']);
+            // ФОРМАТИРУЕМ ФАКТ ВЫПОЛНЕНИЯ: ДД.ММ.ГГГГ ЧЧ:ММ
+            let factVal = item['ufCrm66_1792123436'];
+            let factTime = 'Дата не указана';
+            
+            if (factVal) {
+                if (Array.isArray(factVal)) factVal = factVal[0];
+                if (typeof factVal === 'string' && factVal.includes('T')) {
+                    const d = new Date(factVal);
+                    const day = String(d.getDate()).padStart(2, '0');
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const year = d.getFullYear();
+                    const hours = String(d.getHours()).padStart(2, '0');
+                    const minutes = String(d.getMinutes()).padStart(2, '0');
+                    factTime = `${day}.${month}.${year} ${hours}:${minutes}`;
+                } else if (factVal) {
+                    factTime = factVal;
+                }
+            }
+
             factBlockHtml = `
                 <hr style="border:none;border-top:1px solid #eee;margin:16px 0;">
                 <div class="field" style="background:#e8f5e9; padding:12px; border-radius:8px;">
                     <div class="field-label" style="color:#2e7d32;">Факт выполнения</div>
-                    <div class="field-value" style="font-weight:600; color:#2e7d32;">${factTime !== '—' ? factTime : 'Дата не указана'}</div>
+                    <div class="field-value" style="font-weight:600; color:#2e7d32; font-size: 16px;">${factTime}</div>
                 </div>
                 <button class="btn btn-secondary" disabled>Заявка завершена</button>
             `;
