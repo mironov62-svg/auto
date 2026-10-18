@@ -117,7 +117,7 @@
             gap: 6px;
         }
 
-        /* СТИЛЬ ДЛЯ ВОДИТЕЛЯ (Синий) */
+        /* СТИЛЬ ДЛЯ ВОДИТЕЛЯ (Синий, с автомобилем) */
         .driver-badge {
             background: #e3f2fd;
             color: #1976d2;
@@ -446,7 +446,6 @@ async function loadItems() {
         document.getElementById('badge-progress').textContent = inProgress.length;
         document.getElementById('badge-done').textContent = done.length;
 
-        // Передаем стадию, чтобы функция знала, кого подсвечивать
         renderList('list-requests', requests, 'Нет новых заявок', STAGE_START);
         renderList('list-progress', inProgress, 'Нет заявок в исполнении', STAGE_IN_PROGRESS);
         renderList('list-done', done, 'Нет выполненных заявок', STAGE_DONE);
@@ -479,19 +478,17 @@ function renderList(containerId, items, emptyText, stage) {
             metaParts.push(`Срок: ${deadline}`);
         }
 
-        // Логика вывода бейджа в зависимости от стадии
         if (stage === STAGE_START) {
-            // Для новых заявок выводим Заказчика (ответственного)
             const customerName = usersCache[item.assignedById];
             if (customerName) {
                 metaParts.push(`<span class="customer-badge">🏢 ${customerName}</span>`);
             }
         } else {
-            // Для остальных стадий выводим Водителя
             const driverId = item[FIELD_DRIVER];
             const driverName = usersCache[driverId] || usersCache[item.assignedById]; 
             if (driverName) {
-                metaParts.push(`<span class="driver-badge">👤 ${driverName}</span>`);
+                // ЗДЕСЬ ЗАМЕНЕН ЭМОДЗИ НА АВТОМОБИЛЬ
+                metaParts.push(`<span class="driver-badge">🚗 ${driverName}</span>`);
             }
         }
         
