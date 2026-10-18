@@ -106,11 +106,37 @@
         .card-title {
             font-size: 16px;
             font-weight: 500;
-            margin-bottom: 4px;
+            margin-bottom: 6px;
         }
         .card-meta {
             font-size: 13px;
             color: #888;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        /* СТИЛЬ ДЛЯ ВОДИТЕЛЯ (Синий) */
+        .driver-badge {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 12px;
+            display: inline-block;
+        }
+
+        /* СТИЛЬ ДЛЯ ЗАКАЗЧИКА (Оранжевый) */
+        .customer-badge {
+            background: #fff3e0;
+            color: #e65100;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 12px;
+            display: inline-block;
         }
 
         .modal-overlay {
@@ -258,8 +284,8 @@
 <div id="app">
     <div class="header-bar">
         <div class="header-left">
-            <img class="header-gif" src="tenor.gif" alt="Анимация">
-            <div class="header-title">Заявки для автомобиля</div>
+            <img class="header-gif" src="jerry.gif" alt="Анимация">
+            <div class="header-title">Заявки</div>
         </div>
         <button class="refresh-btn-text" onclick="loadItems()">
             <span style="font-size:16px;">⟳</span> Обновить
@@ -267,7 +293,7 @@
     </div>
 
     <div id="loading" class="loading">
-        <img class="loading-gif" src="tenor.gif" alt="Загрузка">
+        <img class="loading-gif" src="jerry.gif" alt="Загрузка">
         <div>Загрузка заявок…</div>
     </div>
     <div id="error" class="error-msg" style="display:none;"></div>
@@ -298,7 +324,7 @@
 
 <script>
 // ============================================================
-// НАСТРОЙКИ (ВСТАВЬТЕ ВАШ ВЕБХУК НИЖЕ)
+// НАСТРОЙКИ
 // ============================================================
 const WEBHOOK_URL = 'https://b24-964ige.bitrix24.ru/rest/1/' + 's5e6wykwdgtxuuoh' + '/';
 const ENTITY_TYPE_ID = 1110;
@@ -312,7 +338,7 @@ const FIELD_ADDRESS = 'ufCrm66_1792116814';
 const FIELD_WEIGHT = 'ufCrm66_1792116834';
 const FIELD_COMMENT = 'ufCrm66_1792116866';
 const FIELD_DEADLINE = 'ufCrm66_1792116893';
-const FIELD_DRIVER = 'ufCrm66_1792116928'; // Поле "Водитель" (Привязка к пользователю)
+const FIELD_DRIVER = 'ufCrm66_1792116928'; 
 const FIELD_PHOTO = 'ufCrm66_1792125123';
 
 // ============================================================
@@ -374,7 +400,6 @@ function formatDate(field) {
     if (typeof val === 'string' && val.includes('T')) {
         try {
             const d = new Date(val);
-            // Возвращаем только день и месяц (например, 20.10)
             const day = String(d.getDate()).padStart(2, '0');
             const month = String(d.getMonth() + 1).padStart(2, '0');
             return `${day}.${month}`;
@@ -405,7 +430,6 @@ async function loadItems() {
 
         const items = res.result?.items || [];
         
-        // Собираем ID всех пользователей (и ответственных, и водителей)
         const userIds = new Set();
         items.forEach(i => {
             if (i.assignedById) userIds.add(i.assignedById);
@@ -422,9 +446,10 @@ async function loadItems() {
         document.getElementById('badge-progress').textContent = inProgress.length;
         document.getElementById('badge-done').textContent = done.length;
 
-        renderList('list-requests', requests, 'Нет новых заявок');
-        renderList('list-progress', inProgress, 'Нет заявок в исполнении');
-        renderList('list-done', done, 'Нет выполненных заявок');
+        // Передаем стадию, чтобы функция знала, кого подсвечивать
+        renderList('list-requests', requests, 'Нет новых заявок', STAGE_START);
+        renderList('list-progress', inProgress, 'Нет заявок в исполнении', STAGE_IN_PROGRESS);
+        renderList('list-done', done, 'Нет выполненных заявок', STAGE_DONE);
 
         document.getElementById('loading').style.display = 'none';
         document.getElementById('content').style.display = 'block';
@@ -436,7 +461,7 @@ async function loadItems() {
     }
 }
 
-function renderList(containerId, items, emptyText) {
+function renderList(containerId, items, emptyText, stage) {
     const container = document.getElementById(containerId);
     if (items.length === 0) {
         container.innerHTML = '<div class="empty">' + emptyText + '</div>';
@@ -449,14 +474,28 @@ function renderList(containerId, items, emptyText) {
         const org = extractText(item[FIELD_ORG]);
         const deadline = formatDate(item[FIELD_DEADLINE]);
         
-        // Берем имя водителя, если есть, иначе ответственного
-        const driverId = item[FIELD_DRIVER];
-        const driverName = usersCache[driverId] || usersCache[item.assignedById] || '';
-        
         let metaParts = [];
-        if (deadline !== '—') metaParts.push('Срок: ' + deadline);
-        if (driverName) metaParts.push(driverName);
-        const metaStr = metaParts.join(' | ');
+        if (deadline !== '—') {
+            metaParts.push(`Срок: ${deadline}`);
+        }
+
+        // Логика вывода бейджа в зависимости от стадии
+        if (stage === STAGE_START) {
+            // Для новых заявок выводим Заказчика (ответственного)
+            const customerName = usersCache[item.assignedById];
+            if (customerName) {
+                metaParts.push(`<span class="customer-badge">🏢 ${customerName}</span>`);
+            }
+        } else {
+            // Для остальных стадий выводим Водителя
+            const driverId = item[FIELD_DRIVER];
+            const driverName = usersCache[driverId] || usersCache[item.assignedById]; 
+            if (driverName) {
+                metaParts.push(`<span class="driver-badge">👤 ${driverName}</span>`);
+            }
+        }
+        
+        let metaStr = metaParts.join(' '); 
 
         return `
             <div class="card" onclick="openCard(${item.id})">
@@ -485,7 +524,7 @@ async function openCard(id) {
                 'id', 'title', 'stageId', 'assignedById', 
                 FIELD_ORG, FIELD_ADDRESS, FIELD_WEIGHT, 
                 FIELD_COMMENT, FIELD_DEADLINE, FIELD_DRIVER, 
-                'ufCrm66_1792123436' // Факт выполнения
+                'ufCrm66_1792123436' 
             ]
         });
 
@@ -527,7 +566,6 @@ async function openCard(id) {
 
         let factBlockHtml = '';
         if (isDone) {
-            // Берем время ровно в том виде, в котором оно пришло из Битрикс24
             let factVal = item['ufCrm66_1792123436'];
             let factTime = 'Дата не указана';
             
@@ -535,17 +573,13 @@ async function openCard(id) {
                 if (Array.isArray(factVal)) factVal = factVal[0];
                 
                 if (typeof factVal === 'string' && factVal.includes('T')) {
-                    // Разбиваем строку "2026-10-17T20:41:01+03:00" по букве T
                     const parts = factVal.split('T');
-                    const datePart = parts[0]; // "2026-10-17"
-                    const timePart = parts[1]; // "20:41:01+03:00"
+                    const datePart = parts[0]; 
+                    const timePart = parts[1]; 
                     
-                    // Переворачиваем дату в ДД.ММ.ГГГГ
-                    const d = datePart.split('-'); // ["2026", "10", "17"]
+                    const d = datePart.split('-'); 
                     const formattedDate = `${d[2]}.${d[1]}.${d[0]}`;
-                    
-                    // Берем только часы и минуты из времени
-                    const formattedTime = timePart.substring(0, 5); // "20:41"
+                    const formattedTime = timePart.substring(0, 5); 
                     
                     factTime = `${formattedDate} ${formattedTime}`;
                 } else if (factVal) {
@@ -671,7 +705,7 @@ async function markDone() {
 function fileToBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onload = () => reader.result.split(',')[1];
         reader.onerror = reject;
         reader.readAsDataURL(file);
     });
