@@ -25,6 +25,20 @@
             border-radius: 12px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.08);
         }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .header-gif {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            object-fit: cover;
+            flex-shrink: 0;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            border: 2px solid #fff;
+        }
         .header-title {
             font-size: 18px;
             font-weight: 600;
@@ -204,6 +218,13 @@
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .loading { text-align: center; padding: 40px; color: #999; }
+        .loading-gif {
+            width: 80px;
+            height: 80px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            object-fit: cover;
+        }
         .error-msg {
             background: #fee;
             color: #c00;
@@ -236,13 +257,19 @@
 
 <div id="app">
     <div class="header-bar">
-        <div class="header-title">Заявки</div>
+        <div class="header-left">
+            <img class="header-gif" src="https://media1.tenor.com/m/tWAaAdanH88AAAAC/multiversus-jerry.gif" alt="Анимация" referrerpolicy="no-referrer">
+            <div class="header-title">Заявки</div>
+        </div>
         <button class="refresh-btn-text" onclick="loadItems()">
             <span style="font-size:16px;">⟳</span> Обновить
         </button>
     </div>
 
-    <div id="loading" class="loading">Загрузка заявок…</div>
+    <div id="loading" class="loading">
+        <img class="loading-gif" src="https://media1.tenor.com/m/tWAaAdanH88AAAAC/multiversus-jerry.gif" alt="Загрузка" referrerpolicy="no-referrer">
+        <div>Загрузка заявок…</div>
+    </div>
     <div id="error" class="error-msg" style="display:none;"></div>
     
     <div id="content" style="display:none;">
